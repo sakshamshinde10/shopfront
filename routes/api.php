@@ -1,6 +1,9 @@
 <?php
 
+use App\Http\Controllers\PublicSiteController;
+use App\Http\Controllers\PublishController;
 use App\Http\Controllers\QuestionController;
+use App\Http\Controllers\SectionController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\SourceController;
 use Illuminate\Support\Facades\Route;
@@ -19,4 +22,17 @@ Route::middleware('site.owner')->prefix('sites/{site}')->group(function () {
     // Read the sources and write the site (a background job), and answer the owner's questions.
     Route::post('/generate', [SiteController::class, 'generate'])->middleware('throttle:6,1');
     Route::post('/questions/{question}/answer', [QuestionController::class, 'answer'])->scopeBindings();
+
+    // Edit or regenerate one section of the site, and put the site online or take it offline.
+    Route::patch('/sections/{key}', [SectionController::class, 'update'])->where('key', 'hero|about|services|contact');
+    Route::post('/sections/{key}/regenerate', [SectionController::class, 'regenerate'])
+        ->where('key', 'hero|about|services|contact')->middleware('throttle:10,1');
+    Route::post('/publish', [PublishController::class, 'publish']);
+    Route::delete('/publish', [PublishController::class, 'unpublish']);
+});
+
+// What visitors see. No token: it only works for sites that have been published.
+Route::prefix('public/{slug}')->where(['slug' => '[a-z0-9-]+'])->middleware('throttle:120,1')->group(function () {
+    Route::get('/', [PublicSiteController::class, 'show']);
+    Route::get('/photos/{photo}', [PublicSiteController::class, 'photo'])->whereNumber('photo');
 });

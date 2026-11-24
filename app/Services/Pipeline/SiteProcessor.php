@@ -45,7 +45,7 @@ class SiteProcessor
             return;
         }
 
-        $usedAi = $this->writer->write($site);
+        $usedAi = $this->writer->write($site)->usedAi;
 
         $site->update([
             'status' => Site::READY,

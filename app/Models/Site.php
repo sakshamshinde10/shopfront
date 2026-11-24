@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 class Site extends Model
@@ -24,7 +25,7 @@ class Site extends Model
     // The AI was unavailable and we could not finish. Sources are kept; the owner can try again.
     public const FAILED = 'failed';
 
-    protected $fillable = ['business_name', 'city', 'status', 'notice'];
+    protected $fillable = ['business_name', 'city', 'status', 'notice', 'published_at'];
 
     protected $attributes = ['status' => self::DRAFT];
 
@@ -75,6 +76,16 @@ class Site extends Model
     public function sections(): HasMany
     {
         return $this->hasMany(Section::class)->orderBy('position');
+    }
+
+    /** Uploaded photos, in the order they were added. Only real image types are ever shown. */
+    public function photos(): Collection
+    {
+        return $this->sources()
+            ->where('kind', Source::FILE)
+            ->whereIn('mime', Source::PUBLIC_IMAGE_TYPES)
+            ->orderBy('id')
+            ->get();
     }
 
     public function isPublished(): bool

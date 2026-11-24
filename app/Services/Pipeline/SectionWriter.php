@@ -21,21 +21,30 @@ class SectionWriter
     public function __construct(private readonly GeminiClient $ai) {}
 
     /**
-     * @param  list<string>|null  $only  rewrite just these sections (the owner pressed "regenerate")
-     * @return bool true when the AI wrote the text, false when we had to use the plain version
+     * @param  list<string>|null  $only  rewrite just these sections
+     * @param  bool  $force  the owner asked for this: replace even sections they edited, and fail
+     *                       instead of quietly falling back to the plain version when the AI is down
+     *
+     * @throws AiUnavailable only when $force is set and the AI was needed
      */
-    public function write(Site $site, ?array $only = null): bool
+    public function write(Site $site, ?array $only = null, bool $force = false): WriteOutcome
     {
         $facts = $site->facts()->where('status', Fact::CONFIRMED)->get()->groupBy('field');
         $evidence = $this->evidence($site, $facts);
         $usedAi = true;
         $prose = ['tagline' => null, 'about' => [], 'services' => []];
 
-        // Only ask the AI when there is something to write about.
-        if ($facts->has('about') || $facts->has('service')) {
+        // The contact section is copied from the facts and never needs the AI. Otherwise only ask
+        // the AI when there is something to write about.
+        $needsProse = $only === null || array_intersect($only, ['hero', 'about', 'services']) !== [];
+
+        if ($needsProse && ($facts->has('about') || $facts->has('service'))) {
             try {
                 $prose = $this->prose($site, $facts, $evidence);
-            } catch (AiUnavailable) {
+            } catch (AiUnavailable $e) {
+                if ($force) {
+                    throw $e;
+                }
                 $usedAi = false;
             }
         }
@@ -47,14 +56,17 @@ class SectionWriter
             'contact' => $this->contact($facts),
         ];
 
+        $written = [];
         foreach (Section::KEYS as $position => $key) {
             if ($only !== null && ! in_array($key, $only, true)) {
                 continue;
             }
-            $this->store($site, $key, $position, $sections[$key]);
+            if ($this->store($site, $key, $position, $sections[$key], $force)) {
+                $written[] = $key;
+            }
         }
 
-        return $usedAi;
+        return new WriteOutcome($usedAi, $written);
     }
 
     /** @return array{tagline: ?string, about: list<string>, services: list<array{name: string, description: ?string}>} */
@@ -134,22 +146,31 @@ class SectionWriter
         return $site->business_name.' '.$site->city.' '.$facts->flatten()->pluck('value')->implode(' ');
     }
 
-    private function store(Site $site, string $key, int $position, array $content): void
+    /** @return bool true when the section was saved */
+    private function store(Site $site, string $key, int $position, array $content, bool $force): bool
     {
         $existing = $site->sections()->where('key', $key)->first();
 
-        // The owner's own edits are never overwritten.
-        if ($existing?->edited_by_owner) {
-            return;
+        // The owner's own edits are only replaced when they ask for it.
+        if ($existing?->edited_by_owner && ! $force) {
+            return false;
         }
 
         if (! $this->hasContent($key, $content)) {
-            $existing?->delete();
+            // Nothing to write from. A normal run tidies up; an explicit request never deletes anything.
+            if (! $force) {
+                $existing?->delete();
+            }
 
-            return;
+            return false;
         }
 
-        $site->sections()->updateOrCreate(['key' => $key], ['position' => $position, 'content' => $content]);
+        $site->sections()->updateOrCreate(
+            ['key' => $key],
+            ['position' => $position, 'content' => $content, 'edited_by_owner' => false],
+        );
+
+        return true;
     }
 
     private function hasContent(string $key, array $content): bool

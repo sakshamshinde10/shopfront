@@ -22,6 +22,9 @@ class Source extends Model
 
     public const BLOCKED = 'blocked';
 
+    // The only file types a public page may serve. SVG is left out on purpose: it can carry scripts.
+    public const PUBLIC_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
     // What a web search found: the list of matching places, or the website of one of them.
     public const SEARCH = 'search';
 

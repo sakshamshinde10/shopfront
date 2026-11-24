@@ -21,6 +21,7 @@ class SiteResource extends JsonResource
             // A short message for the owner, for example when the AI was unavailable.
             'notice' => $this->notice,
             'published_at' => $this->published_at,
+            'public_url' => $this->isPublished() ? url("/s/{$this->slug}") : null,
             'sources' => SourceResource::collection($this->whenLoaded('sources')),
             'questions' => QuestionResource::collection($this->whenLoaded('openQuestions')),
             'sections' => SectionResource::collection($this->whenLoaded('sections')),
