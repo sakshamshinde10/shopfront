@@ -18,8 +18,12 @@ class SiteResource extends JsonResource
             'business_name' => $this->business_name,
             'city' => $this->city,
             'status' => $this->status,
+            // A short message for the owner, for example when the AI was unavailable.
+            'notice' => $this->notice,
             'published_at' => $this->published_at,
             'sources' => SourceResource::collection($this->whenLoaded('sources')),
+            'questions' => QuestionResource::collection($this->whenLoaded('openQuestions')),
+            'sections' => SectionResource::collection($this->whenLoaded('sections')),
             // Reading links and files happens in the background; the page can poll until this is 0.
             'pending_sources' => $this->whenLoaded(
                 'sources',

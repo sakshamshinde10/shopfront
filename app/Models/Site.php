@@ -21,7 +21,10 @@ class Site extends Model
 
     public const PUBLISHED = 'published';
 
-    protected $fillable = ['business_name', 'city', 'status'];
+    // The AI was unavailable and we could not finish. Sources are kept; the owner can try again.
+    public const FAILED = 'failed';
+
+    protected $fillable = ['business_name', 'city', 'status', 'notice'];
 
     protected $attributes = ['status' => self::DRAFT];
 
@@ -82,5 +85,10 @@ class Site extends Model
     public function openQuestions(): HasMany
     {
         return $this->questions()->whereNull('answered_at');
+    }
+
+    public function hasBlockingQuestions(): bool
+    {
+        return $this->openQuestions()->whereIn('kind', Question::BLOCKING)->exists();
     }
 }

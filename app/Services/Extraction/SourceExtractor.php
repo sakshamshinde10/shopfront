@@ -27,6 +27,7 @@ class SourceExtractor
         try {
             match ($source->kind) {
                 Source::LINK => $this->link($source),
+                Source::SEARCH => $source->url ? $this->link($source) : $this->finish($source, $source->text),
                 Source::FILE => $this->file($source),
                 default => $this->finish($source, $source->text),
             };

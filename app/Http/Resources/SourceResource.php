@@ -19,6 +19,8 @@ class SourceResource extends JsonResource
             'status' => $this->status,
             // For "blocked" and "failed" this tells the owner what to do next.
             'message' => $this->error,
+            // Set when the file or page had text aimed at the AI. It was ignored.
+            'warning' => $this->warning,
             'created_at' => $this->created_at,
         ];
     }

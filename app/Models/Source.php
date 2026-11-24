@@ -22,10 +22,20 @@ class Source extends Model
 
     public const BLOCKED = 'blocked';
 
-    protected $fillable = ['site_id', 'kind', 'label', 'url', 'path', 'mime', 'status', 'text', 'error'];
+    // What a web search found: the list of matching places, or the website of one of them.
+    public const SEARCH = 'search';
+
+    protected $fillable = [
+        'site_id', 'kind', 'label', 'url', 'path', 'mime', 'status', 'text', 'error', 'warning', 'identity', 'analysed_at',
+    ];
 
     // Raw extracted text can be large and is not needed by the browser.
     protected $hidden = ['text', 'path'];
+
+    protected function casts(): array
+    {
+        return ['identity' => 'array', 'analysed_at' => 'datetime'];
+    }
 
     public function site(): BelongsTo
     {

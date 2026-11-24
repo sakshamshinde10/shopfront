@@ -13,10 +13,13 @@ class Fact extends Model
 
     public const REJECTED = 'rejected';
 
-    // Fields that can only have one true value. Two different values means a conflict.
-    public const SINGLE_VALUE = ['phone', 'email', 'address', 'hours', 'name'];
+    // What we try to find out about a business.
+    public const FIELDS = ['phone', 'email', 'address', 'hours', 'about', 'service', 'price', 'social'];
 
-    protected $fillable = ['site_id', 'source_id', 'field', 'value', 'status'];
+    // Fields that can only have one true value. Two different values means a conflict.
+    public const SINGLE_VALUE = ['phone', 'email', 'address', 'hours'];
+
+    protected $fillable = ['site_id', 'source_id', 'field', 'business', 'value', 'status'];
 
     public function site(): BelongsTo
     {

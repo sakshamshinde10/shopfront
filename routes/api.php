@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\QuestionController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\SourceController;
 use Illuminate\Support\Facades\Route;
@@ -14,4 +15,8 @@ Route::middleware('site.owner')->prefix('sites/{site}')->group(function () {
     Route::post('/sources', [SourceController::class, 'store'])->middleware('throttle:30,1');
     Route::post('/files', [SourceController::class, 'upload'])->middleware('throttle:10,1');
     Route::delete('/sources/{source}', [SourceController::class, 'destroy'])->scopeBindings();
+
+    // Read the sources and write the site (a background job), and answer the owner's questions.
+    Route::post('/generate', [SiteController::class, 'generate'])->middleware('throttle:6,1');
+    Route::post('/questions/{question}/answer', [QuestionController::class, 'answer'])->scopeBindings();
 });

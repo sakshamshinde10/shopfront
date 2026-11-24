@@ -13,7 +13,10 @@ class Question extends Model
 
     public const MISSING = 'missing';
 
-    protected $fillable = ['site_id', 'kind', 'field', 'prompt', 'options', 'answer', 'answered_at'];
+    protected $fillable = ['site_id', 'source_id', 'kind', 'field', 'prompt', 'options', 'answer', 'answered_at'];
+
+    // These stop the site from being written until the owner answers. "missing" ones are optional.
+    public const BLOCKING = [self::PICK_BUSINESS, self::CONFLICT];
 
     protected function casts(): array
     {
@@ -23,6 +26,11 @@ class Question extends Model
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
+    }
+
+    public function source(): BelongsTo
+    {
+        return $this->belongsTo(Source::class);
     }
 
     public function isOpen(): bool
