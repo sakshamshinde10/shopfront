@@ -20,6 +20,8 @@ class SiteResource extends JsonResource
             'status' => $this->status,
             // A short message for the owner, for example when the AI was unavailable.
             'notice' => $this->notice,
+            // The section being rewritten right now, or null.
+            'regenerating' => $this->regenerating,
             'published_at' => $this->published_at,
             'public_url' => $this->isPublished() ? url("/s/{$this->slug}") : null,
             'sources' => SourceResource::collection($this->whenLoaded('sources')),

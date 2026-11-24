@@ -72,7 +72,9 @@ class SectionWriter
     /** @return array{tagline: ?string, about: list<string>, services: list<array{name: string, description: ?string}>} */
     private function prose(Site $site, Collection $facts, string $evidence): array
     {
-        $list = $facts->flatten()
+        // The writer only gets what the business is and what it offers. Phone, hours, address and prices
+        // are shown in their own places on the page, so the AI never sees them and cannot repeat them.
+        $list = $facts->filter(fn ($group, $field) => in_array($field, ['about', 'service'], true))->flatten()
             ->map(fn (Fact $f) => ['field' => $f->field, 'value' => $f->value])
             ->values()->all();
 

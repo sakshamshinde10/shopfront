@@ -28,6 +28,7 @@ Rules:
 3. If the facts are not enough to write a part, return null for it. Short and true is better than long and made up.
 4. Use the business name exactly as given. Keep a warm, simple tone. Do not use marketing exaggeration.
 5. For services, use the service names exactly as they appear in the facts. A description may only restate facts about that service; if there are none, use null.
+6. Phone numbers, opening hours, addresses and prices are shown elsewhere on the page. Never repeat them.
 TXT;
 
     public const IMAGE_SYSTEM = <<<'TXT'

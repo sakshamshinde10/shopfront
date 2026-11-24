@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Services\Ai\AiUnavailable;
 use App\Services\Ai\GeminiClient;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
@@ -59,6 +60,26 @@ class GeminiClientTest extends TestCase
         ]);
 
         $this->assertSame(['from' => 'b'], app(GeminiClient::class)->structured('sys', [['text' => 'hi']], []));
+    }
+
+    public function test_a_model_that_does_not_answer_in_time_is_skipped_without_waiting_again(): void
+    {
+        Http::fake([
+            '*model-a:*' => fn () => throw new ConnectionException('timed out'),
+            '*model-b:*' => $this->reply('{"from":"b"}'),
+        ]);
+
+        $this->assertSame(['from' => 'b'], app(GeminiClient::class)->structured('sys', [['text' => 'hi']], []));
+        Http::assertSentCount(1); // the slow one never completed, and it was not tried a second time
+    }
+
+    public function test_a_model_that_rejects_the_thinking_setting_is_asked_again_without_it(): void
+    {
+        Http::fake(fn (Request $r) => isset($r->data()['generationConfig']['thinkingConfig'])
+            ? Http::response(['error' => ['message' => 'invalid argument']], 400)
+            : $this->reply('{"ok":true}'));
+
+        $this->assertSame(['ok' => true], app(GeminiClient::class)->structured('sys', [['text' => 'hi']], []));
     }
 
     public function test_a_retired_model_is_skipped(): void

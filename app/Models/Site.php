@@ -25,7 +25,7 @@ class Site extends Model
     // The AI was unavailable and we could not finish. Sources are kept; the owner can try again.
     public const FAILED = 'failed';
 
-    protected $fillable = ['business_name', 'city', 'status', 'notice', 'published_at'];
+    protected $fillable = ['business_name', 'city', 'status', 'notice', 'regenerating', 'published_at'];
 
     protected $attributes = ['status' => self::DRAFT];
 

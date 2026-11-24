@@ -3,6 +3,8 @@
 namespace App\Services\Ai;
 
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
@@ -121,19 +123,32 @@ class GeminiClient
         $url = rtrim(config('services.gemini.base_url'), '/')."/models/{$model}:generateContent";
 
         try {
-            return Http::withHeaders(['x-goog-api-key' => $key])
-                ->acceptJson()
-                ->timeout((int) config('services.gemini.timeout', 60))
-                ->retry(
-                    [1500],
-                    when: fn ($e) => $e instanceof ConnectionException
-                        || ($e->response?->status() === 429 || $e->response?->serverError()),
-                    throw: false,
-                )
-                ->post($url, $body);
+            $response = $this->request($key)->post($url, $body);
+
+            // Some models (the "lite" ones) do not accept the thinking setting. Ask again without it.
+            if ($response->status() === 400 && isset($body['generationConfig']['thinkingConfig'])) {
+                unset($body['generationConfig']['thinkingConfig']);
+                $response = $this->request($key)->post($url, $body);
+            }
+
+            return $response;
         } catch (ConnectionException) {
+            // A model that does not answer in time is not worth waiting for again: the next one may be fine.
             throw new AiUnavailable('The AI service did not respond. Your sources are saved, please try again in a moment.');
         }
+    }
+
+    private function request(string $key): PendingRequest
+    {
+        return Http::withHeaders(['x-goog-api-key' => $key])
+            ->acceptJson()
+            ->timeout((int) config('services.gemini.timeout', 40))
+            // One short retry for "busy" answers only. Timeouts are not retried; we move to the next model instead.
+            ->retry(
+                [1000],
+                when: fn ($e) => $e instanceof RequestException && ($e->response->status() === 429 || $e->response->serverError()),
+                throw: false,
+            );
     }
 
     private function checked(Response $response): Response

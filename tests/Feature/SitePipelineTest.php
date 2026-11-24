@@ -107,6 +107,30 @@ class SitePipelineTest extends TestCase
         $this->assertSame('Mon-Sat 9am-9pm', $this->section($site, 'contact')['hours']);
     }
 
+    public function test_the_writer_is_not_even_shown_contact_details_or_prices(): void
+    {
+        $this->fakeGemini([
+            'extract' => fn () => ['businesses' => [$this->business([
+                ['phone', '9876543210', 'Call 9876543210'],
+                ['hours', 'Mon-Sat 9am-9pm'],
+                ['price', 'Plum cake 250'],
+                ['about', 'We bake cakes in Pune.'],
+                ['service', 'Plum cake'],
+            ])]],
+        ]);
+        $this->start(['note' => 'Call 9876543210. Mon-Sat 9am-9pm. Plum cake 250. We bake cakes in Pune. Plum cake']);
+
+        $this->generate();
+
+        $writerCall = collect($this->geminiCalls)->first(fn ($c) => isset($c['generationConfig']['responseSchema']['properties']['tagline']));
+        $shown = $writerCall['contents'][0]['parts'][0]['text'];
+        $this->assertStringContainsString('We bake cakes in Pune.', $shown);
+        $this->assertStringContainsString('Plum cake', $shown);
+        $this->assertStringNotContainsString('9876543210', $shown);
+        $this->assertStringNotContainsString('9am-9pm', $shown);
+        $this->assertStringNotContainsString('Plum cake 250', $shown);
+    }
+
     public function test_missing_basics_become_optional_questions_that_do_not_block(): void
     {
         $this->fakeGemini(['extract' => fn () => ['businesses' => [$this->business([['phone', '9876543210', 'Call 9876543210']])]]]);

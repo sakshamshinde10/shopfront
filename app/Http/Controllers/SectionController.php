@@ -4,10 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\UpdateSectionRequest;
 use App\Http\Resources\SectionResource;
+use App\Http\Resources\SiteResource;
+use App\Jobs\RegenerateSection;
 use App\Models\Section;
 use App\Models\Site;
-use App\Services\Ai\AiUnavailable;
-use App\Services\Pipeline\SectionWriter;
 use Illuminate\Http\JsonResponse;
 
 class SectionController extends Controller
@@ -33,8 +33,11 @@ class SectionController extends Controller
         return new SectionResource($section);
     }
 
-    /** Write one section again from the confirmed facts. This replaces the owner's edits, because they asked for it. */
-    public function regenerate(Site $site, string $key, SectionWriter $writer): SectionResource|JsonResponse
+    /**
+     * Write one section again from the confirmed facts. This replaces the owner's edits, because they asked.
+     * It runs in the background (the AI can take a while), so the answer is "accepted" and the page polls.
+     */
+    public function regenerate(Site $site, string $key): JsonResponse
     {
         if ($site->status === Site::PROCESSING) {
             return response()->json(['message' => 'The site is being built. Please wait a moment.'], 409);
@@ -43,18 +46,16 @@ class SectionController extends Controller
             return response()->json(['message' => 'Please answer the open questions first, so we know which details are right.'], 422);
         }
 
-        try {
-            $outcome = $writer->write($site, [$key], force: true);
-        } catch (AiUnavailable $e) {
-            // Nothing was changed. The owner keeps the current text.
-            return response()->json(['message' => $e->getMessage()], 503);
+        // Claim the site in one step, so two clicks cannot start two rewrites.
+        $claimed = Site::whereKey($site->id)->whereNull('regenerating')->update(['regenerating' => $key, 'notice' => null]);
+
+        if (! $claimed) {
+            return response()->json(['message' => 'Another section is being rewritten. Please wait a moment.'], 409);
         }
 
-        if (! in_array($key, $outcome->written, true)) {
-            return response()->json(['message' => 'There is not enough confirmed information to write this section yet.'], 422);
-        }
+        RegenerateSection::dispatch($site, $key);
 
-        return new SectionResource($site->sections()->where('key', $key)->firstOrFail());
+        return (new SiteResource($site->refresh()->load(['sections'])))->response()->setStatusCode(202);
     }
 
     /** @param array<string, mixed> $data */

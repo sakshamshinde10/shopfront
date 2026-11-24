@@ -151,6 +151,11 @@ class SiteEditingTest extends TestCase
 
     // ---- regenerating ------------------------------------------------------------
 
+    private function section(string $key): ?Section
+    {
+        return Section::where('site_id', $this->id)->where('key', $key)->first();
+    }
+
     private function withFacts(): void
     {
         $this->confirmedFact('about', 'We bake cakes in Pune.');
@@ -164,10 +169,14 @@ class SiteEditingTest extends TestCase
         $this->seedSection('about', ['paragraphs' => ['My own words.']], edited: true);
         $this->fakeGemini(['write' => ['tagline' => null, 'about' => ['Sharma Bakery bakes cakes in Pune.'], 'services' => []]]);
 
-        $this->regenerate('about')
-            ->assertOk()
-            ->assertJsonPath('data.content.paragraphs', ['Sharma Bakery bakes cakes in Pune.'])
-            ->assertJsonPath('data.edited_by_owner', false);
+        // The request is accepted at once and the rewrite runs in the background.
+        $this->regenerate('about')->assertStatus(202);
+
+        $this->assertSame(['Sharma Bakery bakes cakes in Pune.'], $this->section('about')->content['paragraphs']);
+        $this->assertFalse($this->section('about')->edited_by_owner);
+        $site = Site::find($this->id);
+        $this->assertNull($site->regenerating);
+        $this->assertNull($site->notice);
     }
 
     public function test_regenerating_one_section_leaves_the_others_alone(): void
@@ -177,9 +186,9 @@ class SiteEditingTest extends TestCase
         $this->seedSection('about', ['paragraphs' => ['old']]);
         $this->fakeGemini(['write' => ['tagline' => 'New', 'about' => ['We bake cakes in Pune.'], 'services' => []]]);
 
-        $this->regenerate('about')->assertOk();
+        $this->regenerate('about')->assertStatus(202);
 
-        $this->assertSame('Keep me', Section::where('key', 'hero')->first()->content['tagline']);
+        $this->assertSame('Keep me', $this->section('hero')->content['tagline']);
     }
 
     public function test_a_normal_run_never_overwrites_what_the_owner_edited(): void
@@ -199,11 +208,14 @@ class SiteEditingTest extends TestCase
         $this->seedSection('about', ['paragraphs' => ['My own words.']], edited: true);
         $this->fakeGemini(['status' => 503]);
 
-        $this->regenerate('about')->assertStatus(503)->assertJsonStructure(['message']);
+        $this->regenerate('about')->assertStatus(202);
 
-        $section = Section::where('key', 'about')->first();
-        $this->assertSame(['My own words.'], $section->content['paragraphs']);
-        $this->assertTrue($section->edited_by_owner);
+        // Nothing changed, the owner is told why, and the site is free for another try.
+        $this->assertSame(['My own words.'], $this->section('about')->content['paragraphs']);
+        $this->assertTrue($this->section('about')->edited_by_owner);
+        $site = Site::find($this->id);
+        $this->assertStringContainsString('Your current text was kept', $site->notice);
+        $this->assertNull($site->regenerating);
     }
 
     public function test_the_contact_section_is_rebuilt_from_facts_without_the_ai(): void
@@ -212,8 +224,9 @@ class SiteEditingTest extends TestCase
         $this->seedSection('contact', ['phone' => '0000000000'], edited: true);
         $this->fakeGemini(['status' => 503]);
 
-        $this->regenerate('contact')->assertOk()->assertJsonPath('data.content.phone', '9876543210');
+        $this->regenerate('contact')->assertStatus(202);
 
+        $this->assertSame('9876543210', $this->section('contact')->content['phone']);
         $this->assertSame([], $this->geminiCalls);
     }
 
@@ -221,9 +234,25 @@ class SiteEditingTest extends TestCase
     {
         $this->seedSection('about', ['paragraphs' => ['My own words.']], edited: true);
 
-        $this->regenerate('about')->assertUnprocessable();
+        $this->regenerate('about')->assertStatus(202);
 
-        $this->assertSame(['My own words.'], Section::where('key', 'about')->first()->content['paragraphs']);
+        $this->assertSame(['My own words.'], $this->section('about')->content['paragraphs']);
+        $this->assertStringContainsString('not enough confirmed information', Site::find($this->id)->notice);
+    }
+
+    public function test_only_one_section_is_rewritten_at_a_time(): void
+    {
+        $this->withFacts();
+        Site::whereKey($this->id)->update(['regenerating' => 'hero']);
+
+        $this->regenerate('about')->assertStatus(409);
+    }
+
+    public function test_the_page_is_told_which_section_is_being_written(): void
+    {
+        Site::whereKey($this->id)->update(['regenerating' => 'services']);
+
+        $this->asOwner($this->token)->getJson("/api/sites/{$this->id}")->assertJsonPath('data.regenerating', 'services');
     }
 
     public function test_regenerating_waits_while_facts_are_in_doubt_or_the_site_is_busy(): void
