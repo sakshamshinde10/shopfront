@@ -8,7 +8,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Question extends Model
 {
     public const PICK_BUSINESS = 'pick_business';
+
     public const CONFLICT = 'conflict';
+
     public const MISSING = 'missing';
 
     protected $fillable = ['site_id', 'kind', 'field', 'prompt', 'options', 'answer', 'answered_at'];

@@ -8,7 +8,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Fact extends Model
 {
     public const CANDIDATE = 'candidate';
+
     public const CONFIRMED = 'confirmed';
+
     public const REJECTED = 'rejected';
 
     // Fields that can only have one true value. Two different values means a conflict.

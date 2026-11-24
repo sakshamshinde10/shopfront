@@ -9,12 +9,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Source extends Model
 {
     public const LINK = 'link';
+
     public const FILE = 'file';
+
     public const NOTE = 'note';
 
     public const PENDING = 'pending';
+
     public const DONE = 'done';
+
     public const FAILED = 'failed';
+
     public const BLOCKED = 'blocked';
 
     protected $fillable = ['site_id', 'kind', 'label', 'url', 'path', 'mime', 'status', 'text', 'error'];

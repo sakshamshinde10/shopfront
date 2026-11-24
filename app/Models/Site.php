@@ -12,12 +12,18 @@ class Site extends Model
     use HasFactory;
 
     public const DRAFT = 'draft';
+
     public const PROCESSING = 'processing';
+
     public const NEEDS_INPUT = 'needs_input';
+
     public const READY = 'ready';
+
     public const PUBLISHED = 'published';
 
     protected $fillable = ['business_name', 'city', 'status'];
+
+    protected $attributes = ['status' => self::DRAFT];
 
     // The edit token is a secret: never include it in JSON by accident.
     protected $hidden = ['edit_token'];
